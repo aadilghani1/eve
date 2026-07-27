@@ -81,6 +81,24 @@ export function getSessionTokenUsage(session: Pick<HarnessSession, "state">): To
   return getTurnUsageState(session.state)?.session ?? ZERO_TOKEN_USAGE;
 }
 
+/**
+ * Returns usage charged to the current session token-budget window.
+ *
+ * Lifetime usage remains available through {@link getSessionTokenUsage};
+ * subtracting the last continuation baseline gives the amount that counts
+ * against the next limit check and delegated-child grant.
+ */
+export function getSessionTokenBudgetWindowUsage(
+  session: Pick<HarnessSession, "state">,
+): Pick<TokenUsageTotals, "inputTokens" | "outputTokens"> {
+  const usage = getSessionTokenUsage(session);
+  const baseline = getSessionTokenBudgetBaseline(session.state);
+  return {
+    inputTokens: usage.inputTokens - baseline.inputTokens,
+    outputTokens: usage.outputTokens - baseline.outputTokens,
+  };
+}
+
 /** Projects a {@link TokenUsageTotals} down to the cross-cutting {@link TokenUsage} shape. */
 export function toUsage(totals: TokenUsageTotals): TokenUsage {
   return {
@@ -141,12 +159,11 @@ export function extendSessionTokenBudget(session: HarnessSession): HarnessSessio
 export function getSessionTokenLimitViolation(
   session: Pick<HarnessSession, "limits" | "state">,
 ): SessionTokenLimitViolation | null {
-  const usage = getSessionTokenUsage(session);
-  const baseline = getSessionTokenBudgetBaseline(session.state);
+  const usage = getSessionTokenBudgetWindowUsage(session);
   const maxInputTokensPerSession = session.limits?.maxInputTokensPerSession;
   const maxOutputTokensPerSession = session.limits?.maxOutputTokensPerSession;
-  const inputTokensInWindow = usage.inputTokens - baseline.inputTokens;
-  const outputTokensInWindow = usage.outputTokens - baseline.outputTokens;
+  const inputTokensInWindow = usage.inputTokens;
+  const outputTokensInWindow = usage.outputTokens;
   if (maxInputTokensPerSession !== undefined && inputTokensInWindow >= maxInputTokensPerSession) {
     return {
       kind: "input",

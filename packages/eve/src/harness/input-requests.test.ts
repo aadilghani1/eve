@@ -909,14 +909,18 @@ describe("resolvePendingInput with a session-limit continuation batch", () => {
     expect(result.messages).toEqual([{ content: "previous", role: "user" }]);
   });
 
-  it("treats a plain follow-up message as ignoring the prompt", () => {
+  it("keeps the prompt pending and queues a plain follow-up message", () => {
     const result = resolvePendingInput({
       session: createLimitBatchSession(),
       stepInput: { message: "also do this other thing" },
     });
 
-    expect(result.outcome).toBe("resolved");
+    expect(result.outcome).toBe("unresolved");
     expect(result.limitContinuation).toBeUndefined();
     expect(result.messages).toEqual([{ content: "previous", role: "user" }]);
+    expect(hasDeferredStepInput(result.session)).toBe(true);
+
+    const deferred = consumeDeferredStepInput({ session: result.session });
+    expect(deferred.input).toEqual({ message: "also do this other thing" });
   });
 });

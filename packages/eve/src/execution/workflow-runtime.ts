@@ -256,10 +256,27 @@ export function createWorkflowRuntime(config: {
 export async function requestWorkflowTurnCancellation(
   input: CancelTurnInput,
 ): Promise<CancelTurnResult> {
-  const payload: TurnCancelPayload = input.turnId === undefined ? {} : { turnId: input.turnId };
+  const payload: { kind: "turn"; turnId?: string } = { kind: "turn" };
+  if (input.turnId !== undefined) payload.turnId = input.turnId;
 
+  return await requestWorkflowCancellation(input.sessionId, payload);
+}
+
+/** Propagates a delegated session-limit decline to its root session. */
+export async function requestWorkflowSessionLimitDecline(input: {
+  readonly sessionId: string;
+}): Promise<CancelTurnResult> {
+  return await requestWorkflowCancellation(input.sessionId, {
+    kind: "session-limit-declined",
+  });
+}
+
+async function requestWorkflowCancellation(
+  sessionId: string,
+  payload: TurnCancelPayload,
+): Promise<CancelTurnResult> {
   try {
-    await resumeHook(sessionCancelHookToken(input.sessionId), payload);
+    await resumeHook(sessionCancelHookToken(sessionId), payload);
     return { status: "accepted" };
   } catch (error) {
     if (isInactiveCancelTarget(error)) {

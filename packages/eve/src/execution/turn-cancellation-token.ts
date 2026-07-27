@@ -7,6 +7,13 @@ export function sessionCancelHookToken(sessionId: string): string {
  * Payload accepted by the session cancel hook. A mismatched `turnId` is a
  * benign no-op; omitting it targets whichever turn owns the hook.
  */
-export interface TurnCancelPayload {
+export type TurnCancelPayload = {
   readonly turnId?: string;
-}
+} & (
+  | {
+      readonly kind: "session-limit-declined";
+    }
+  | {
+      readonly kind: "turn";
+    }
+);

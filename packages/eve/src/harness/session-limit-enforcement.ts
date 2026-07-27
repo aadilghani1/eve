@@ -46,13 +46,13 @@ interface SessionLimitPolicyInput {
  * Granted: resets the token budget windows via
  * {@link extendSessionTokenBudget} and lets the step continue transparently.
  * Declined: a user decision, not an error — the decline cancels the
- * in-flight turn tree through the standard cancellation path, settling as
- * `turn.cancelled` → `session.waiting` with no failure surfaced anywhere.
+ * in-flight turn tree and terminally completes the root session, settling as
+ * `turn.cancelled` → `session.completed` with no failure surfaced anywhere.
  * The harness only declares the intent by throwing
  * {@link SessionLimitDeclinedError}; the execution layer detects it at the
- * step boundary and cancels the root turn, whose cancelled arm cascades to
- * every descendant, so the delegating parent never receives an error result
- * it could retry against a fresh budget share.
+ * step boundary and terminally cancels the root turn, whose cancelled arm
+ * cascades to every descendant, so the delegating parent never receives an
+ * error result it could retry against a fresh budget share.
  *
  * Returns `result: null` when the step should continue with `session`.
  */
@@ -70,14 +70,13 @@ export async function applySessionLimitContinuation(
   }
 
   // A session parked on the continuation prompt always satisfies the
-  // cancelled-park guard (conversation mode, or a continuation token
+  // cancellation-settle guard (conversation mode, or a continuation token
   // anchoring it to a waiting parent) — parking the prompt required one of
-  // the two. The terminal fallback covers any future caller that resolves
-  // a decline outside that state, where a thrown cancellation could not
-  // settle as a park.
-  const canSettleCancelledPark =
+  // the two. The fallback covers any future caller that resolves a decline
+  // outside that state, where a thrown cancellation could not settle.
+  const canSettleCancellation =
     input.config.mode === "conversation" || input.session.continuationToken !== "";
-  if (!canSettleCancelledPark) {
+  if (!canSettleCancellation) {
     const violation = getSessionTokenLimitViolation(input.session);
     return {
       result:
@@ -108,7 +107,11 @@ export async function enforceSessionTokenLimit(
   }
 
   const { emit } = input;
+  // A zero limit is an exhausted quota inherited by a delegated task.
+  // Continuing would reset its baseline but still grant a zero-token window,
+  // so fail the child and let its parent reach the resumable limit gate.
   if (
+    violation.limit > 0 &&
     emit !== undefined &&
     (input.config.mode === "conversation" || input.config.capabilities?.requestInput === true)
   ) {

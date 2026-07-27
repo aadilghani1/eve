@@ -11,9 +11,9 @@ export class TurnCancelledError extends Error {
 /**
  * A turn cancellation raised when the user declines a session-limit
  * continuation prompt. Carries intent only — the execution layer detects it
- * at the step boundary and cancels the root turn, so a delegated child's
- * decline stops the whole delegation tree. Keeps the harness free of
- * cross-session cancellation authority.
+ * at the step boundary and terminally cancels the root session, so a
+ * delegated child's decline stops the whole delegation tree. Keeps the
+ * harness free of cross-session cancellation authority.
  */
 export class SessionLimitDeclinedError extends TurnCancelledError {
   readonly sessionLimitDeclined = true;

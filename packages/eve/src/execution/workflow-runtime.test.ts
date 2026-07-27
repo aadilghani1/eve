@@ -6,6 +6,7 @@ import { resolveInstalledPackageInfo } from "#internal/application/package.js";
 import {
   createWorkflowRuntime,
   LATEST_DEPLOYMENT_UNSUPPORTED_MESSAGE,
+  requestWorkflowSessionLimitDecline,
   turnWorkflowReference,
   workflowEntryReference,
 } from "#execution/workflow-runtime.js";
@@ -151,16 +152,32 @@ describe("createWorkflowRuntime#cancelTurn", () => {
     await expect(
       buildRuntime().cancelTurn({ sessionId: "session-1", turnId: "turn-2" }),
     ).resolves.toEqual({ status: "accepted" });
-    expect(resumeHookMock).toHaveBeenCalledWith("session-1:cancel", { turnId: "turn-2" });
+    expect(resumeHookMock).toHaveBeenCalledWith("session-1:cancel", {
+      kind: "turn",
+      turnId: "turn-2",
+    });
   });
 
-  it("uses an empty payload for an unguarded cancel", async () => {
+  it("identifies an unguarded turn cancellation", async () => {
     resumeHookMock.mockResolvedValue({ runId: "turn-run" });
 
     await expect(buildRuntime().cancelTurn({ sessionId: "session-1" })).resolves.toEqual({
       status: "accepted",
     });
-    expect(resumeHookMock).toHaveBeenCalledWith("session-1:cancel", {});
+    expect(resumeHookMock).toHaveBeenCalledWith("session-1:cancel", { kind: "turn" });
+  });
+
+  it("propagates a delegated session-limit decline", async () => {
+    resumeHookMock.mockResolvedValue({ runId: "turn-run" });
+
+    await expect(
+      requestWorkflowSessionLimitDecline({
+        sessionId: "session-1",
+      }),
+    ).resolves.toEqual({ status: "accepted" });
+    expect(resumeHookMock).toHaveBeenCalledWith("session-1:cancel", {
+      kind: "session-limit-declined",
+    });
   });
 
   it("maps missing and terminal targets to 'no_active_turn'", async () => {
