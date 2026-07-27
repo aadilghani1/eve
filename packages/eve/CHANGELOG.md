@@ -1,5 +1,11 @@
 # eve
 
+## 0.27.9
+
+### Patch Changes
+
+- 83c753e: Harden `web_fetch` against SSRF by requiring HTTPS, rejecting non-public destinations during DNS resolution, and returning redirect targets without following them automatically.
+
 ## 0.27.8
 
 ### Patch Changes
